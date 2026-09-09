@@ -4,6 +4,7 @@
 /build/
 
 # root build output (the distributable lives in release/)
+/AngryMoz.exe
 /mosquito.exe
 
 # local machine state

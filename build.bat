@@ -2,7 +2,7 @@
 REM Build the native Windows exe with the MinGW-w64 g++ already on PATH.
 REM -static => no libgcc/libstdc++ DLL dependency; -s => strip; -mwindows => GUI subsystem.
 setlocal
-set OUT=mosquito.exe
+set OUT=AngryMoz.exe
 windres app.rc -O coff -o app_res.o
 if %ERRORLEVEL% NEQ 0 ( echo RESOURCE COMPILE FAILED & exit /b 1 )
 g++ -std=c++17 -O2 -s -static -mwindows ^

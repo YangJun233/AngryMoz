@@ -18,7 +18,7 @@ BEGIN
             VALUE "FileDescription", "AngryMoz (Angry Mosquito) - sit/sleep nudger"
             VALUE "FileVersion", "1.0.0.0"
             VALUE "InternalName", "AngryMoz"
-            VALUE "OriginalFilename", "mosquito.exe"
+            VALUE "OriginalFilename", "AngryMoz.exe"
             VALUE "ProductName", "AngryMoz"
             VALUE "ProductVersion", "1.0.0"
         END

@@ -28,7 +28,7 @@ a single self-contained `.exe` (~500 KB, no runtime needed, ~2–4 MB RAM, ~0% C
   (a stray touch only pauses the count; constant fidgeting resets it).
 
 ### Run
-Double-click `mosquito.exe` (in `release/`). It lives in the system tray — **everything
+Double-click `AngryMoz.exe` (in `release/`). It lives in the system tray — **everything
 is on the tray icon's right-click menu** (Dismiss / Pause / Settings / Buzz / Auto-start /
 Help / Exit). No global hotkeys (to avoid conflicts).
 
@@ -37,7 +37,7 @@ Needs MinGW-w64 `g++` (WinLibs UCRT) on PATH.
 ```bat
 build.bat
 ```
-Produces `mosquito.exe`. The exe icon and tray face are the artwork in `icon.png` /
+Produces `AngryMoz.exe`. The exe icon and tray face are the artwork in `icon.png` /
 `app.ico` (regenerate from a source image with `make_icon.py`).
 
 ### Bedtime transcription text
@@ -62,7 +62,7 @@ characters are used for matching; punctuation is ignored).
 - 耗尽后出蚊子；**累计静止 5 分钟**清空（偶尔碰一下只是暂停计时，一直乱动则清零）。
 
 ### 运行
-双击 `release/` 里的 `mosquito.exe`。程序常驻右下角托盘——**所有操作都在托盘图标的右键菜单里**
+双击 `release/` 里的 `AngryMoz.exe`。程序常驻右下角托盘——**所有操作都在托盘图标的右键菜单里**
 （驱散 / 暂停 / 设置 / 嗡嗡声 / 开机自启 / 使用说明 / 退出）。没有全局快捷键（避免冲突）。
 
 ### 编译
@@ -70,7 +70,7 @@ characters are used for matching; punctuation is ignored).
 ```bat
 build.bat
 ```
-生成 `mosquito.exe`。exe 图标和托盘的蚊子脸就是 `icon.png` / `app.ico`（可用 `make_icon.py`
+生成 `AngryMoz.exe`。exe 图标和托盘的蚊子脸就是 `icon.png` / `app.ico`（可用 `make_icon.py`
 从源图重新生成）。
 
 ### 滕王阁序全文
