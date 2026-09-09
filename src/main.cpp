@@ -43,7 +43,7 @@ using namespace Gdiplus;
 // largest case plus margin and never has to be recreated on resize.
 static const int BOX = 220;
 
-#define APP_VER_STR "1.0.0"          // single source of truth (narrow, for update compare)
+#define APP_VER_STR "1.1.0"          // single source of truth (narrow, for update compare)
 #define APP_VER_WIDE2(x) L##x
 #define APP_VER_WIDE(x) APP_VER_WIDE2(x)
 #define APP_VER APP_VER_WIDE(APP_VER_STR)   // wide L"1.0.0" for UI text
