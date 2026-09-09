@@ -460,8 +460,8 @@ struct App {
     bool  depleted = false;    // once empty, mosquitoes stay until a full rest clears them
     bool  working = false;     // a work session is running → drain continuously (wall-clock)
     int   start_run_s = 0;     // consecutive active seconds at full, toward starting a work session
-    int dismiss_N = 300;       // chars to transcribe; grows with each dismissal
-    int dismiss_N_base = 300;  // configured starting value (reset to this each night)
+    int dismiss_N = 100;       // chars to transcribe; grows with each dismissal
+    int dismiss_N_base = 100;  // configured starting value (reset to this each night)
     int dismiss_count = 0;     // dismissals so far tonight (escalating penalty)
     bool escalate_penalty = true;
     bool sound_enabled = true; // the buzzing
@@ -658,27 +658,58 @@ struct App {
 static App g_app;
 static HICON g_win_icon = nullptr;   // the exe icon, for dialog title bars
 
-// ----------------------- 滕王阁序 transcription text ------------------------
+// ----------------------- transcription text (language-aware) ----------------
 //
-// Loaded (Han characters only) from tengwang.txt next to the exe, so the exact
-// version is editable and not baked wrong into the binary; a short built-in
-// fallback keeps things working if the file is missing.
+// Chinese mode transcribes 《滕王阁序》 (Han characters); English mode transcribes
+// a different English article (letters). The text is loaded from an external file
+// next to the exe (tengwang.txt / english.txt) if present, else from the copy
+// embedded in the exe (RCDATA 101 / 102), else a short built-in fallback. The
+// external file always overrides, so the exact text stays editable.
 
 static std::wstring g_text;
 
-static std::wstring filter_han(const std::wstring& s) {
+// Normalize per language: 中文 keeps Han only; English keeps letters, lowercased,
+// with runs of any non-letters collapsed to a single space (natural word gaps).
+static std::wstring filter_text(const std::wstring& s) {
     std::wstring o;
-    for (wchar_t c : s) if (c >= 0x4E00 && c <= 0x9FFF) o += c;
+    if (g_lang == 0) {
+        for (wchar_t c : s) if (c >= 0x4E00 && c <= 0x9FFF) o += c;
+    } else {
+        bool gap = false;
+        for (wchar_t c : s) {
+            bool up = (c >= 'A' && c <= 'Z'), lo = (c >= 'a' && c <= 'z');
+            if (up || lo) {
+                if (gap && !o.empty()) o += L' ';
+                gap = false;
+                o += (wchar_t)(up ? c - 'A' + 'a' : c);
+            } else {
+                gap = true;
+            }
+        }
+    }
     return o;
 }
 
+static bool read_utf8(const char* data, int sz, std::wstring& text) {
+    if (!data || sz <= 0) return false;
+    int off = (sz >= 3 && (unsigned char)data[0] == 0xEF) ? 3 : 0;   // strip BOM
+    int wl = MultiByteToWideChar(CP_UTF8, 0, data + off, sz - off, nullptr, 0);
+    if (wl <= 0) return false;
+    text.resize(wl);
+    MultiByteToWideChar(CP_UTF8, 0, data + off, sz - off, &text[0], wl);
+    return true;
+}
+
 static void load_text() {
+    const wchar_t* fname = g_lang ? L"english.txt" : L"tengwang.txt";
+    int resid = g_lang ? 102 : 101;
+
     wchar_t path[MAX_PATH];
     GetModuleFileName(nullptr, path, MAX_PATH);
     std::wstring p = path;
     size_t pos = p.find_last_of(L"\\/");
     if (pos != std::wstring::npos) p = p.substr(0, pos + 1);
-    p += L"tengwang.txt";
+    p += fname;
 
     std::wstring text;
     HANDLE hf = CreateFile(p.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
@@ -687,30 +718,25 @@ static void load_text() {
         std::string buf(sz, 0);
         if (sz) ReadFile(hf, &buf[0], sz, &rd, nullptr);
         CloseHandle(hf);
-        int off = (buf.size() >= 3 && (unsigned char)buf[0] == 0xEF) ? 3 : 0;   // strip BOM
-        int wl = MultiByteToWideChar(CP_UTF8, 0, buf.data() + off, (int)buf.size() - off, nullptr, 0);
-        if (wl > 0) { text.resize(wl); MultiByteToWideChar(CP_UTF8, 0, buf.data() + off, (int)buf.size() - off, &text[0], wl); }
+        read_utf8(buf.data(), (int)buf.size(), text);
     }
-    // No external file? Fall back to the full text embedded in the exe (RCDATA 101),
-    // so a bare AngryMoz.exe still has a proper transcription. An external
-    // tengwang.txt next to the exe always overrides this.
+    // No external file? Fall back to the copy embedded in the exe, so a bare
+    // AngryMoz.exe still has a proper transcription. The external file overrides.
     if (text.empty()) {
-        HRSRC hr = FindResource(nullptr, MAKEINTRESOURCE(101), RT_RCDATA);
+        HRSRC hr = FindResource(nullptr, MAKEINTRESOURCE(resid), RT_RCDATA);
         if (hr) {
             HGLOBAL hg = LoadResource(nullptr, hr);
-            DWORD sz = SizeofResource(nullptr, hr);
-            const char* data = (const char*)LockResource(hg);
-            if (data && sz) {
-                int off = (sz >= 3 && (unsigned char)data[0] == 0xEF) ? 3 : 0;   // strip BOM
-                int wl = MultiByteToWideChar(CP_UTF8, 0, data + off, (int)sz - off, nullptr, 0);
-                if (wl > 0) { text.resize(wl); MultiByteToWideChar(CP_UTF8, 0, data + off, (int)sz - off, &text[0], wl); }
-            }
+            read_utf8((const char*)LockResource(hg), (int)SizeofResource(nullptr, hr), text);
         }
     }
     if (text.empty())
-        text = L"豫章故郡洪都新府星分翼轸地接衡庐襟三江而带五湖控蛮荆而引瓯越"
-               L"物华天宝龙光射牛斗之墟人杰地灵徐孺下陈蕃之榻雄州雾列俊采星驰";
-    g_text = filter_han(text);
+        text = g_lang
+               ? L"Four score and seven years ago our fathers brought forth on this "
+                 L"continent a new nation conceived in liberty and dedicated to the "
+                 L"proposition that all men are created equal"
+               : L"豫章故郡洪都新府星分翼轸地接衡庐襟三江而带五湖控蛮荆而引瓯越"
+                 L"物华天宝龙光射牛斗之墟人杰地灵徐孺下陈蕃之榻雄州雾列俊采星驰";
+    g_text = filter_text(text);
 }
 
 // ----------------------- dismissal dialog (default) -------------------------
@@ -742,7 +768,7 @@ static void update_progress() {
     std::wstring buf(len + 1, 0);
     if (len) GetWindowText(g_dlg.edit, &buf[0], len + 1);
     buf.resize(len);
-    std::wstring han = filter_han(buf);
+    std::wstring han = filter_text(buf);
     std::wstring target = g_text.substr(g_dlg.start, g_dlg.N);
     int matched = common_prefix(han, target);
     wchar_t s[64];
@@ -765,7 +791,7 @@ static LRESULT CALLBACK DlgProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         std::wstring buf(len + 1, 0);
         if (len) GetWindowText(g_dlg.edit, &buf[0], len + 1);
         buf.resize(len);
-        bool done = common_prefix(filter_han(buf), target) >= g_dlg.N;
+        bool done = common_prefix(filter_text(buf), target) >= g_dlg.N;
         if (done) g_app.dismiss_success();
         return 0;
     }
@@ -780,6 +806,7 @@ static LRESULT CALLBACK DlgProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 
 static void open_dismiss() {
     if (g_dlg.open) { SetForegroundWindow(g_dlg.hwnd); return; }
+    load_text();                          // reload so the text matches the current language
     if ((int)g_text.size() < 20) return;
 
     int N = g_app.dismiss_N;
@@ -1106,7 +1133,7 @@ struct Settings {
     int work_min = 40, rest_min = 5, sed_step_min = 1, sed_max = 5, work_break_min = 15;
     int sleep_enabled = 1, sleep_start = 23 * 60 + 30, sleep_end = 6 * 60, sleep_step_min = 3, sleep_max = 10;
     double sleep_mult = 2.0, base_size = 3.0, max_speed = 32.0;
-    int dismiss_N = 300, return_min = 5, escalate_penalty = 1;
+    int dismiss_N = 100, return_min = 5, escalate_penalty = 1;
     int sound = 1, autostart = 0;
     int lang = 0;   // 0 = 中文, 1 = English
 } g_settings;

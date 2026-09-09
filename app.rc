@@ -1,6 +1,7 @@
 1 ICON "app.ico"
 100 RCDATA "icon.png"
 101 RCDATA "tengwang.txt"
+102 RCDATA "english.txt"
 
 1 VERSIONINFO
 FILEVERSION 1,0,0,0

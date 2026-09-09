@@ -40,13 +40,18 @@ build.bat
 Produces `AngryMoz.exe`. The exe icon and tray face are the artwork in `icon.png` /
 `app.ico` (regenerate from a source image with `make_icon.py`).
 
-### Bedtime transcription text
-The transcription text is **embedded in the exe**, so a bare `AngryMoz.exe` works on
-its own (no extra files, no "untrusted file" prompts). To override it, drop a
-`tengwang.txt` next to the exe — when present it takes priority. Only Han characters
-are used for matching; punctuation and line breaks are ignored. The embedded copy is
-whatever `tengwang.txt` contains at build time, so to change it, edit that file and
-rebuild.
+### Bedtime transcription text (language-aware)
+The transcription text depends on the UI language and is **embedded in the exe**, so a
+bare `AngryMoz.exe` works on its own (no extra files, no "untrusted file" prompts):
+
+- **Chinese** transcribes 《滕王阁序》 — only Han characters are matched.
+- **English** transcribes an English article (ships with Lincoln's public-domain
+  Gettysburg Address) — only letters are matched (punctuation and case ignored).
+
+To override either, drop a `tengwang.txt` (Chinese) or `english.txt` (English) next to
+the exe; when present it takes priority over the embedded copy. Default length is 100
+characters, +100 per dismissal. The embedded copies are whatever `tengwang.txt` /
+`english.txt` contain at build time, so to change them, edit those files and rebuild.
 
 ---
 
@@ -77,11 +82,15 @@ build.bat
 生成 `AngryMoz.exe`。exe 图标和托盘的蚊子脸就是 `icon.png` / `app.ico`（可用 `make_icon.py`
 从源图重新生成）。
 
-### 滕王阁序全文
-默写用的文本已**内嵌进 exe**，所以单独一个 `AngryMoz.exe` 也能正常使用（不需要额外文件，
-也不会弹"不受信任文件"的框）。想替换，只需在 exe 旁边放一个 `tengwang.txt`——存在时优先用它。
-程序只取其中的汉字、忽略标点和换行。内嵌的内容就是编译时 `tengwang.txt` 的内容，想改就编辑该
-文件后重新编译。
+### 默写文本（随语言切换）
+默写用的文本随界面语言变化，且已**内嵌进 exe**，所以单独一个 `AngryMoz.exe` 也能正常使用
+（不需要额外文件，也不会弹"不受信任文件"的框）：
+
+- **中文**默写《滕王阁序》——只匹配汉字。
+- **英文**默写一篇英文文章（内置林肯《葛底斯堡演说》，公有领域）——只匹配字母，忽略标点大小写。
+
+想替换：在 exe 旁边放一个 `tengwang.txt`（中文）或 `english.txt`（英文），存在时优先用它。
+默认 100 字，每次驱散 +100。内嵌内容就是编译时这两个文件的内容，想改就编辑后重新编译。
 
 ---
 

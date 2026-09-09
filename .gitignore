@@ -7,6 +7,9 @@
 /AngryMoz.exe
 /mosquito.exe
 
+# packaged release zip (upload to GitHub Releases, not committed)
+/AngryMoz-v*.zip
+
 # local machine state
 AngryMoz.ini
 mosquito.ini

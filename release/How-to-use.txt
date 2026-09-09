@@ -1,0 +1,122 @@
+愤怒的蚊子 · AngryMoz   v1.0.0  —— 久坐/熬夜提醒小工具
+============================================================
+（首次运行会弹出中英文选择，默认中文；之后可在“设置”里切换。）
+(First run asks Chinese/English, default Chinese; switch later in Settings.)
+English version is in the second half of this file ↓
+
+【怎么用】
+双击 AngryMoz.exe 即可运行，程序常驻在右下角任务栏托盘（一个愤怒蚊子图标 + 外圈状态环）。
+没有主窗口，所有操作都在托盘图标上【右键】。
+（软件里也有一份更详细的说明：托盘右键 →“使用说明”。）
+
+【久坐模式（白天）】
+- 精力满时，连续操作键鼠 10 秒 → 判定“开始工作”，开始倒计时。
+- 之后持续消耗精力，托盘环从满(绿)慢慢掉到空(红)，约 40 分钟掉光。
+- 精力耗尽 → 屏幕出现愤怒蚊子；继续用电脑 → 蚊子越来越多。
+- 中途离开（吃饭、上厕所）连续 15 分钟不碰键鼠 → 精力直接回满。
+- 出蚊子后：安静歇着，累计静止满 5 分钟 → 蚊子全消失、精力回满。
+  （偶尔碰一下只是暂停计时；但连续乱动 10 秒会判定“没在休息”，累计清零。）
+- 开会不想被打扰：托盘右键 →“暂停久坐提醒”（30分钟 / 1小时 / 2小时）。
+
+【睡觉模式（默认 23:30 起）】
+- 到点后蚊子会陆续出现，越来越多、越来越大，声音也越来越大，逼你去睡。
+- 要驱散：托盘右键 →“驱散蚊子”，按提示默写一段（催你睡，不是真让你抄）。
+  中文默写《滕王阁序》，英文默写一篇英文文章；默认 100 字，每次驱散会 +100。
+- 撤销后过一会儿会卷土重来。
+
+【托盘右键菜单】
+- 驱散蚊子 —— 仅睡觉模式且有蚊子时可用
+- 暂停久坐提醒 —— 30分钟 / 1小时 / 2小时 / 恢复
+- 设置… —— 工作/休息时长、睡觉时间、蚊子数量大小、声音、字数等
+- 嗡嗡声 —— 开关
+- 开机自启 —— 开关
+- 使用说明 —— 详细图文说明
+- 退出
+
+【设置里能调什么】
+- 工作时长（默认 40 分钟）
+- 离开回满：中途离开/停手多久算真休息、精力回满（默认 15 分钟）
+- 出蚊子后休息：歇多久蚊子消失（默认 5 分钟）
+- 每隔几分钟多一只 / 最多几只
+- 睡觉开始、结束时间
+- 蚊子大小、飞行速度、声音、开机自启
+- 默写字数 N（默认 100）
+
+【默写文本】
+默写用的文本已内嵌进 exe，单独一个 AngryMoz.exe 也能正常使用。
+- 中文用《滕王阁序》；想换，在 exe 旁边放一个 tengwang.txt（只取汉字，忽略标点换行）。
+- 英文用一篇英文文章；想换，在 exe 旁边放一个 english.txt（只取字母，忽略标点大小写）。
+外部文件存在时优先于内嵌版本。
+
+【设置文件】
+设置保存在 AngryMoz.ini（exe 旁边），也可直接编辑。
+
+【占用】
+单文件、无需安装任何运行时；空闲时内存约 2–3MB、CPU 近 0。
+
+
+============================================================
+Angry Mosquito · AngryMoz   v1.0.0  — a sit-less / sleep-on-time nudger
+============================================================
+(First run asks you to pick Chinese or English, default Chinese;
+you can switch anytime in Settings.)
+
+[How to run]
+Double-click AngryMoz.exe. It lives in the system tray (an angry-mosquito
+icon with a status ring around it). There is no main window — everything is
+on the tray icon's RIGHT-CLICK menu. (A fuller in-app help is there too:
+right-click -> "Help".)
+
+[Sedentary mode (daytime)]
+- At full energy, 10 seconds of continuous keyboard/mouse use starts a work
+  session and a countdown.
+- Energy then drains; the tray ring goes from full (green) to empty (red) in
+  about 40 minutes.
+- When energy hits empty, angry mosquitoes appear; keep working and more show up.
+- Step away (lunch, restroom) with 15 minutes of no input -> energy refills.
+- Once mosquitoes are out: sit still, and 5 minutes of accumulated stillness
+  clears them all and refills energy. (An occasional touch only pauses the
+  timer; 10 seconds of continuous activity counts as "not resting" and resets it.)
+- In a meeting? Right-click -> "Pause sedentary reminder" (30 min / 1 h / 2 h).
+
+[Sleep mode (from 23:30 by default)]
+- After bedtime, mosquitoes appear and grow in number, size and loudness to
+  push you to sleep.
+- To dismiss: right-click -> "Dismiss", then transcribe the prompted passage
+  (the point is to nudge you to bed, not to actually make you copy text).
+  Chinese transcribes 《滕王阁序》; English transcribes an English article.
+  Default 100 characters, +100 each time you dismiss.
+- They come back after a while.
+
+[Tray right-click menu]
+- Dismiss mosquitoes — only in sleep mode when mosquitoes are present
+- Pause sedentary reminder — 30 min / 1 h / 2 h / resume
+- Settings… — work/rest durations, bedtime, mosquito count & size, sound, N, etc.
+- Buzzing sound — toggle
+- Run at startup — toggle
+- Help — the detailed guide
+- Quit
+
+[What you can tune in Settings]
+- Work duration (default 40 min)
+- Away -> full: how long away/idle counts as real rest and refills (default 15 min)
+- Rest after mosquitoes: how long of rest clears them (default 5 min)
+- Minutes per extra mosquito / max count
+- Sleep start & end time
+- Mosquito size, flight speed, sound, run-at-startup
+- Transcription length N (default 100)
+
+[Transcription text]
+The transcription text is embedded in the exe, so a bare AngryMoz.exe works
+on its own.
+- Chinese uses 《滕王阁序》; to replace it, put a tengwang.txt next to the exe
+  (only Han characters are used; punctuation/line breaks ignored).
+- English uses an English article; to replace it, put an english.txt next to
+  the exe (only letters are used; punctuation and case ignored).
+An external file always overrides the embedded copy.
+
+[Settings file]
+Settings are saved to AngryMoz.ini next to the exe; you can edit it directly.
+
+[Footprint]
+Single file, no runtime to install; ~2-3 MB RAM idle, near-0% CPU.
