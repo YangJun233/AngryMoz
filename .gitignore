@@ -1,0 +1,13 @@
+# build intermediates
+*.o
+*.obj
+/build/
+
+# root build output (the distributable lives in release/)
+/mosquito.exe
+
+# local machine state
+mosquito.ini
+
+# dev-only preview artifacts
+preview_tray.*
