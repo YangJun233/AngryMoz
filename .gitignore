@@ -8,6 +8,7 @@
 /mosquito.exe
 
 # local machine state
+AngryMoz.ini
 mosquito.ini
 
 # dev-only preview artifacts

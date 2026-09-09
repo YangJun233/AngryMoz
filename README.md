@@ -41,8 +41,12 @@ Produces `AngryMoz.exe`. The exe icon and tray face are the artwork in `icon.png
 `app.ico` (regenerate from a source image with `make_icon.py`).
 
 ### Bedtime transcription text
-`tengwang.txt` ships as a short placeholder. Paste the full text you want (only Han
-characters are used for matching; punctuation is ignored).
+The transcription text is **embedded in the exe**, so a bare `AngryMoz.exe` works on
+its own (no extra files, no "untrusted file" prompts). To override it, drop a
+`tengwang.txt` next to the exe — when present it takes priority. Only Han characters
+are used for matching; punctuation and line breaks are ignored. The embedded copy is
+whatever `tengwang.txt` contains at build time, so to change it, edit that file and
+rebuild.
 
 ---
 
@@ -74,7 +78,10 @@ build.bat
 从源图重新生成）。
 
 ### 滕王阁序全文
-`tengwang.txt` 目前是占位短文。把你想要的全文粘进去覆盖即可（程序只取其中的汉字、忽略标点）。
+默写用的文本已**内嵌进 exe**，所以单独一个 `AngryMoz.exe` 也能正常使用（不需要额外文件，
+也不会弹"不受信任文件"的框）。想替换，只需在 exe 旁边放一个 `tengwang.txt`——存在时优先用它。
+程序只取其中的汉字、忽略标点和换行。内嵌的内容就是编译时 `tengwang.txt` 的内容，想改就编辑该
+文件后重新编译。
 
 ---
 

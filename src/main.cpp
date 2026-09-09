@@ -691,6 +691,22 @@ static void load_text() {
         int wl = MultiByteToWideChar(CP_UTF8, 0, buf.data() + off, (int)buf.size() - off, nullptr, 0);
         if (wl > 0) { text.resize(wl); MultiByteToWideChar(CP_UTF8, 0, buf.data() + off, (int)buf.size() - off, &text[0], wl); }
     }
+    // No external file? Fall back to the full text embedded in the exe (RCDATA 101),
+    // so a bare AngryMoz.exe still has a proper transcription. An external
+    // tengwang.txt next to the exe always overrides this.
+    if (text.empty()) {
+        HRSRC hr = FindResource(nullptr, MAKEINTRESOURCE(101), RT_RCDATA);
+        if (hr) {
+            HGLOBAL hg = LoadResource(nullptr, hr);
+            DWORD sz = SizeofResource(nullptr, hr);
+            const char* data = (const char*)LockResource(hg);
+            if (data && sz) {
+                int off = (sz >= 3 && (unsigned char)data[0] == 0xEF) ? 3 : 0;   // strip BOM
+                int wl = MultiByteToWideChar(CP_UTF8, 0, data + off, (int)sz - off, nullptr, 0);
+                if (wl > 0) { text.resize(wl); MultiByteToWideChar(CP_UTF8, 0, data + off, (int)sz - off, &text[0], wl); }
+            }
+        }
+    }
     if (text.empty())
         text = L"豫章故郡洪都新府星分翼轸地接衡庐襟三江而带五湖控蛮荆而引瓯越"
                L"物华天宝龙光射牛斗之墟人杰地灵徐孺下陈蕃之榻雄州雾列俊采星驰";
@@ -1084,7 +1100,7 @@ static void set_autostart(bool on) {
     RegCloseKey(k);
 }
 
-// ----------------------- settings (mosquito.ini + dialog) -------------------
+// ----------------------- settings (AngryMoz.ini + dialog) -------------------
 
 struct Settings {
     int work_min = 40, rest_min = 5, sed_step_min = 1, sed_max = 5, work_break_min = 15;
@@ -1099,7 +1115,7 @@ static std::wstring ini_path() {
     wchar_t p[MAX_PATH]; GetModuleFileName(nullptr, p, MAX_PATH);
     std::wstring s = p; size_t q = s.find_last_of(L"\\/");
     if (q != std::wstring::npos) s = s.substr(0, q + 1);
-    return s + L"mosquito.ini";
+    return s + L"AngryMoz.ini";
 }
 
 static void load_settings() {
@@ -1403,7 +1419,7 @@ static const wchar_t* HELP_ZH =
     L"· 睡觉开始、结束时间：晚上几点开始催、到几点收工\r\n"
     L"· 蚊子大小、飞行速度：想要更大更快，随你\r\n"
     L"· 声音开关、开机自启\r\n"
-    L"（设置也会存进程序旁边的 mosquito.ini，会玩的也能直接改。）\r\n"
+    L"（设置也会存进程序旁边的 AngryMoz.ini，会玩的也能直接改。）\r\n"
     L"\r\n"
     L"就这些啦！我不是真想烦你，只是想让你身体好一点、睡得早一点。\r\n"
     L"——你的私人蚊子 🦟\r\n";
@@ -1457,7 +1473,7 @@ static const wchar_t* HELP_EN =
     L"- Rest->clear (min): still time after mosquitoes to clear them (default 5)\r\n"
     L"- +1 every / Max: how fast mosquitoes grow and the cap\r\n"
     L"- Bedtime start / end, mosquito size, speed, sound, auto-start\r\n"
-    L"(Settings are saved to mosquito.ini next to the exe; you can edit it directly too.)\r\n"
+    L"(Settings are saved to AngryMoz.ini next to the exe; you can edit it directly too.)\r\n"
     L"\r\n"
     L"That's it! I don't really want to bug you — I just want you healthier and better rested.\r\n"
     L"— your personal mosquito 🦟\r\n";
@@ -1596,7 +1612,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmdLine, int) {
     g_boot = GetTickCount();
     bool first_run = GetFileAttributes(ini_path().c_str()) == INVALID_FILE_ATTRIBUTES;
     load_settings();
-    apply_settings();          // cfg + activity detector + app fields from mosquito.ini
+    apply_settings();          // cfg + activity detector + app fields from AngryMoz.ini
 
     // First launch: ask language (default 中文).
     if (first_run && !fast && !demo && !sleep) {
