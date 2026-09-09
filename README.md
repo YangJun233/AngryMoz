@@ -92,6 +92,15 @@ build.bat
 想替换：在 exe 旁边放一个 `tengwang.txt`（中文）或 `english.txt`（英文），存在时优先用它。
 默认 100 字，每次驱散 +100。内嵌内容就是编译时这两个文件的内容，想改就编辑后重新编译。
 
+### 更新检测 / 跳过休息 · Update check & skip-rest
+- **更新检测：** 启动时静默查一次 GitHub 最新版本；有新版则托盘图标出现红点、右键菜单顶部
+  出现「发现新版本」，点击打开下载页。也可在「设置」里点「检查更新」。只提示、不自动更新，
+  保持轻量。On startup it checks GitHub once; a newer release lights a red dot on the tray
+  icon and a menu item that opens the download page — notify-only, never auto-updates.
+- **跳过本次休息：** 白天蚊子出现时，右键「跳过本次休息」可回满精力继续工作（需连续赶工时用）。
+  暂停久坐提醒后再恢复，也会重置到满精力，不会立刻又冒蚊子。 Right-click "Skip this rest" to
+  refill and keep working; resuming from a pause also refills instead of popping the swarm again.
+
 ---
 
 *Not affiliated with anyone; a personal well-being nudge tool. 个人健康提醒小工具。*

@@ -25,8 +25,10 @@ English version is in the second half of this file ↓
 - 撤销后过一会儿会卷土重来。
 
 【托盘右键菜单】
+- 发现新版本 —— 检测到 GitHub 有新版时才出现（图标右上角也会有红点），点击打开下载页
 - 驱散蚊子 —— 仅睡觉模式且有蚊子时可用
-- 暂停久坐提醒 —— 30分钟 / 1小时 / 2小时 / 恢复
+- 跳过本次休息 —— 白天有蚊子、但你要连续赶工时，回满精力继续（少数情况用）
+- 暂停久坐提醒 —— 30分钟 / 1小时 / 2小时 / 恢复（恢复会重置到满精力，不会立刻又冒蚊子）
 - 设置… —— 工作/休息时长、睡觉时间、蚊子数量大小、声音、字数等
 - 嗡嗡声 —— 开关
 - 开机自启 —— 开关
@@ -47,6 +49,11 @@ English version is in the second half of this file ↓
 - 中文用《滕王阁序》；想换，在 exe 旁边放一个 tengwang.txt（只取汉字，忽略标点换行）。
 - 英文用一篇英文文章；想换，在 exe 旁边放一个 english.txt（只取字母，忽略标点大小写）。
 外部文件存在时优先于内嵌版本。
+
+【检查更新】
+软件启动时会静默检查一次 GitHub 是否有新版本；有的话托盘图标右上角出现红点，
+右键菜单顶部也会出现“发现新版本”。也可在“设置”里点“检查更新”手动查。
+只提示、不自动更新——点开下载页自己下载替换即可（保持软件轻量）。
 
 【设置文件】
 设置保存在 AngryMoz.ini（exe 旁边），也可直接编辑。
@@ -89,8 +96,12 @@ right-click -> "Help".)
 - They come back after a while.
 
 [Tray right-click menu]
+- New version available — appears only when a newer GitHub release exists (the icon
+  also shows a red dot); click it to open the download page
 - Dismiss mosquitoes — only in sleep mode when mosquitoes are present
-- Pause sedentary reminder — 30 min / 1 h / 2 h / resume
+- Skip this rest — daytime swarm is out but you must keep working: refill & continue
+- Pause sedentary reminder — 30 min / 1 h / 2 h / resume (resuming refills to full,
+  so no swarm pops out again immediately)
 - Settings… — work/rest durations, bedtime, mosquito count & size, sound, N, etc.
 - Buzzing sound — toggle
 - Run at startup — toggle
@@ -114,6 +125,12 @@ on its own.
 - English uses an English article; to replace it, put an english.txt next to
   the exe (only letters are used; punctuation and case ignored).
 An external file always overrides the embedded copy.
+
+[Update check]
+On startup it silently checks GitHub once for a newer release. If there is one, a red
+dot appears on the tray icon and a "New version available" item shows at the top of the
+menu; you can also click "Check update" in Settings. It only notifies, never auto-updates
+— open the page and download the new exe yourself (keeps the app lightweight).
 
 [Settings file]
 Settings are saved to AngryMoz.ini next to the exe; you can edit it directly.

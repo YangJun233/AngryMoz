@@ -7,7 +7,7 @@ windres app.rc -O coff -o app_res.o
 if %ERRORLEVEL% NEQ 0 ( echo RESOURCE COMPILE FAILED & exit /b 1 )
 g++ -std=c++17 -O2 -s -static -mwindows ^
     src\main.cpp app_res.o -o %OUT% ^
-    -lgdiplus -lgdi32 -luser32 -lshell32 -lwinmm -lshlwapi
+    -lgdiplus -lgdi32 -luser32 -lshell32 -lwinmm -lshlwapi -lwinhttp
 if %ERRORLEVEL% NEQ 0 (
     echo BUILD FAILED
     exit /b 1

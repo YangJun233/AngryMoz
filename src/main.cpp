@@ -26,6 +26,7 @@
 #include <shellapi.h>
 #include <mmsystem.h>
 #include <shlwapi.h>
+#include <winhttp.h>
 #include <vector>
 #include <deque>
 #include <string>
@@ -42,7 +43,10 @@ using namespace Gdiplus;
 // largest case plus margin and never has to be recreated on resize.
 static const int BOX = 220;
 
-#define APP_VER L"1.0.0"   // single source of truth for the displayed version
+#define APP_VER_STR "1.0.0"          // single source of truth (narrow, for update compare)
+#define APP_VER_WIDE2(x) L##x
+#define APP_VER_WIDE(x) APP_VER_WIDE2(x)
+#define APP_VER APP_VER_WIDE(APP_VER_STR)   // wide L"1.0.0" for UI text
 
 // ------------------------------- language -----------------------------------
 static int g_lang = 0;   // 0 = 中文 (default), 1 = English
@@ -425,6 +429,12 @@ static const UINT IDM_AUTOSTART = 203;
 static const UINT IDM_SOUND     = 204;
 static const UINT IDM_SETTINGS  = 205;
 static const UINT IDM_HELP      = 206;
+static const UINT IDM_SKIP_REST = 207;
+static const UINT IDM_UPDATE_OPEN = 208;
+
+// Update check (set by a background thread; read on the UI thread).
+static volatile bool g_update_ready = false;   // a newer GitHub release exists
+static std::wstring   g_update_tag;             // its tag, e.g. "v1.1.0"
 
 static void update_tray();          // defined after the tray helpers below
 static void sound_set_volume(float v);
@@ -471,7 +481,16 @@ struct App {
 
     bool is_sed_paused() { return sed_pause_until && GetTickCount() < sed_pause_until; }
     void pause_sed(int minutes) { sed_pause_until = GetTickCount() + (DWORD)minutes * 60000; work_seconds = 0; }
-    void resume_sed() { sed_pause_until = 0; work_seconds = 0; }
+
+    // Reset the sedentary energy model to a clean full-battery state and clear any
+    // swarm. Used when resuming from a pause and by "skip this rest" — so you never
+    // come back to a mid-depletion state with mosquitoes waiting to pop out again.
+    void refresh_full() {
+        battery = 1.0f; depleted = false; working = false;
+        start_run_s = 0; overwork_s = 0; rest_s = 0; active_run_s = 0;
+        clear_swarm();
+    }
+    void resume_sed() { sed_pause_until = 0; work_seconds = 0; refresh_full(); }
 
     void update_sound() {
         if (!sound_enabled || !rendering || mos.empty()) { sound_set_volume(0.0f); return; }
@@ -924,6 +943,14 @@ static HICON draw_tray_icon(float prog, Color col, float alpha) {
         arc.SetStartCap(LineCapRound); arc.SetEndCap(LineCapRound);
         g.DrawArc(&arc, 3.0f, 3.0f, 26.0f, 26.0f, -90.0f, prog * 360.0f);
     }
+    // "Update available" badge — a small red dot, top-right, always at full opacity
+    // (stays visible through blink/breathe) so it reads as a persistent notification.
+    if (g_update_ready) {
+        SolidBrush dot(Color(255, 229, 60, 60));
+        Pen ring(Color(255, 255, 255, 255), 1.5f);
+        g.FillEllipse(&dot, 20.0f, 1.0f, 10.0f, 10.0f);
+        g.DrawEllipse(&ring, 20.0f, 1.0f, 10.0f, 10.0f);
+    }
     HICON ic = nullptr;
     bmp.GetHICON(&ic);
     return ic;
@@ -1129,6 +1156,105 @@ static void set_autostart(bool on) {
     RegCloseKey(k);
 }
 
+// ----------------------- update check (GitHub Releases) ---------------------
+//
+// Lightweight: one silent HTTPS GET on startup (a background thread that exits
+// when done — no polling, no resident timer). If a newer release exists we flip
+// g_update_ready, which paints a red dot on the tray icon and adds a "download"
+// item to the menu. We never download or self-update; the user grabs the exe.
+
+static const wchar_t* RELEASES_URL = L"https://github.com/YangJun233/AngryMoz/releases/latest";
+
+static bool https_get_release(std::string& out) {
+    bool ok = false;
+    HINTERNET s = WinHttpOpen(L"AngryMoz/" APP_VER, WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                              WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!s) return false;
+    WinHttpSetTimeouts(s, 5000, 5000, 5000, 5000);
+    HINTERNET c = WinHttpConnect(s, L"api.github.com", INTERNET_DEFAULT_HTTPS_PORT, 0);
+    if (c) {
+        HINTERNET r = WinHttpOpenRequest(c, L"GET", L"/repos/YangJun233/AngryMoz/releases/latest",
+                                         nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
+        if (r) {
+            WinHttpAddRequestHeaders(r, L"Accept: application/vnd.github+json\r\n", (DWORD)-1, WINHTTP_ADDREQ_FLAG_ADD);
+            if (WinHttpSendRequest(r, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0)
+                    && WinHttpReceiveResponse(r, nullptr)) {
+                DWORD avail = 0;
+                do {
+                    avail = 0;
+                    if (!WinHttpQueryDataAvailable(r, &avail)) break;
+                    if (avail) {
+                        std::string buf(avail, 0); DWORD rd = 0;
+                        if (WinHttpReadData(r, &buf[0], avail, &rd)) out.append(buf.data(), rd);
+                    }
+                } while (avail > 0);
+                ok = !out.empty();
+            }
+            WinHttpCloseHandle(r);
+        }
+        WinHttpCloseHandle(c);
+    }
+    WinHttpCloseHandle(s);
+    return ok;
+}
+
+static std::string parse_tag_name(const std::string& body) {
+    size_t p = body.find("\"tag_name\"");
+    if (p == std::string::npos) return "";
+    p = body.find(':', p); if (p == std::string::npos) return "";
+    p = body.find('"', p); if (p == std::string::npos) return "";
+    size_t q = body.find('"', p + 1); if (q == std::string::npos) return "";
+    return body.substr(p + 1, q - p - 1);
+}
+
+static bool ver_newer(const std::string& latest, const std::string& cur) {
+    auto nextnum = [](const std::string& s, size_t& i) {
+        int v = 0; while (i < s.size() && s[i] >= '0' && s[i] <= '9') v = v * 10 + (s[i++] - '0');
+        if (i < s.size() && s[i] == '.') ++i; return v;
+    };
+    size_t ai = 0, bi = 0;
+    for (int k = 0; k < 3; ++k) { int a = nextnum(latest, ai), b = nextnum(cur, bi); if (a != b) return a > b; }
+    return false;
+}
+
+// 1 = update available, 0 = up to date, -1 = check failed. Sets g_update_* when newer.
+static int do_update_check() {
+    std::string body;
+    if (!https_get_release(body)) return -1;
+    std::string tag = parse_tag_name(body);
+    if (tag.empty()) return -1;
+    std::string latest = tag;
+    if (!latest.empty() && (latest[0] == 'v' || latest[0] == 'V')) latest.erase(0, 1);
+    if (!ver_newer(latest, APP_VER_STR)) return 0;
+    int wl = MultiByteToWideChar(CP_UTF8, 0, tag.data(), (int)tag.size(), nullptr, 0);
+    std::wstring w(wl, 0);
+    if (wl > 0) MultiByteToWideChar(CP_UTF8, 0, tag.data(), (int)tag.size(), &w[0], wl);
+    g_update_tag = w;
+    g_update_ready = true;   // set last: the UI reads the tag only once this is true
+    return 1;
+}
+
+static DWORD WINAPI update_thread(LPVOID) { do_update_check(); return 0; }
+
+static void check_update_interactive(HWND owner) {
+    HCURSOR old = SetCursor(LoadCursor(nullptr, IDC_WAIT));
+    int r = do_update_check();
+    SetCursor(old);
+    if (r < 0) {
+        MessageBox(owner, T(L"检查更新失败，请检查网络连接。", L"Update check failed — check your network."),
+                   BRAND(), MB_OK | MB_ICONWARNING);
+    } else if (r == 0) {
+        MessageBox(owner, T(L"已是最新版本。", L"You're on the latest version."),
+                   BRAND(), MB_OK | MB_ICONINFORMATION);
+    } else {
+        std::wstring msg = std::wstring(T(L"发现新版本 ", L"New version ")) + g_update_tag
+                           + T(L"（当前 v" APP_VER L"）。\n是否打开下载页面？",
+                               L" available (current v" APP_VER L").\nOpen the download page?");
+        if (MessageBox(owner, msg.c_str(), BRAND(), MB_YESNO | MB_ICONINFORMATION) == IDYES)
+            ShellExecute(nullptr, L"open", RELEASES_URL, nullptr, nullptr, SW_SHOWNORMAL);
+    }
+}
+
 // ----------------------- settings (AngryMoz.ini + dialog) -------------------
 
 struct Settings {
@@ -1216,7 +1342,7 @@ static void apply_settings() {
     g_app.escalate_penalty = g.escalate_penalty != 0;
 }
 
-static const UINT IDSAVE = 400, IDCANC = 401;
+static const UINT IDSAVE = 400, IDCANC = 401, IDBTN_UPDATE = 402;
 
 struct SettingsDlg {
     HWND hwnd = nullptr, work, wbrk, rest, sstep, smax;
@@ -1314,6 +1440,8 @@ static LRESULT CALLBACK SetProc(HWND h, UINT m, WPARAM w, LPARAM l) {
             DestroyWindow(h);
         } else if (LOWORD(w) == IDCANC) {
             DestroyWindow(h);
+        } else if (LOWORD(w) == IDBTN_UPDATE) {
+            check_update_interactive(h);
         }
         return 0;
     }
@@ -1382,7 +1510,9 @@ static void open_settings() {
     CreateWindow(L"BUTTON", T(L"保存", L"Save"), WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, 330 * g_sc, 456 * g_sc, 110 * g_sc, 32 * g_sc, d, (HMENU)(INT_PTR)IDSAVE, g_app.hInst, nullptr);
     CreateWindow(L"BUTTON", T(L"取消", L"Cancel"), WS_CHILD | WS_VISIBLE, 455 * g_sc, 456 * g_sc, 110 * g_sc, 32 * g_sc, d, (HMENU)(INT_PTR)IDCANC, g_app.hInst, nullptr);
     CreateWindow(L"STATIC", L"AngryMoz  v" APP_VER, WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
-                 20 * g_sc, 456 * g_sc, 150 * g_sc, 32 * g_sc, d, nullptr, g_app.hInst, nullptr);
+                 20 * g_sc, 456 * g_sc, 140 * g_sc, 32 * g_sc, d, nullptr, g_app.hInst, nullptr);
+    CreateWindow(L"BUTTON", T(L"检查更新", L"Check update"), WS_CHILD | WS_VISIBLE,
+                 168 * g_sc, 456 * g_sc, 140 * g_sc, 32 * g_sc, d, (HMENU)(INT_PTR)IDBTN_UPDATE, g_app.hInst, nullptr);
 
     g_set.font = CreateFont(15 * g_sc, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Microsoft YaHei");
     EnumChildWindows(d, [](HWND c, LPARAM lp) -> BOOL { SendMessage(c, WM_SETFONT, (WPARAM)lp, TRUE); return TRUE; }, (LPARAM)g_set.font);
@@ -1435,7 +1565,8 @@ static const wchar_t* HELP_ZH =
     L"\r\n"
     L"【右键菜单都有啥】\r\n"
     L"· 驱散蚊子 —— 晚上有蚊子时，默写驱散\r\n"
-    L"· 暂停久坐提醒 —— 开会神器\r\n"
+    L"· 跳过本次休息 —— 白天有蚊子但你要连续赶工时，回满精力继续（少数情况用）\r\n"
+    L"· 暂停久坐提醒 —— 开会神器（暂停后恢复会重置到满精力，不会立刻又冒蚊子）\r\n"
     L"· 设置 —— 各种时间、数量自己调（见下）\r\n"
     L"· 嗡嗡声 —— 嫌吵可以关掉\r\n"
     L"· 开机自启 —— 开机就自动帮你盯着\r\n"
@@ -1491,7 +1622,8 @@ static const wchar_t* HELP_EN =
     L"\r\n"
     L"[Right-click menu]\r\n"
     L"- Dismiss — transcribe to clear the night mosquitoes\r\n"
-    L"- Pause sedentary — meeting saver\r\n"
+    L"- Skip this rest — daytime swarm is out but you must keep working: refill & go on\r\n"
+    L"- Pause sedentary — meeting saver (resuming refills to full, no instant swarm)\r\n"
     L"- Settings — times, counts, size, sound, etc.\r\n"
     L"- Buzz — sound on/off\r\n"
     L"- Auto-start — run at startup\r\n"
@@ -1578,8 +1710,16 @@ static LRESULT CALLBACK CtrlProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         if (LOWORD(lp) == WM_RBUTTONUP || LOWORD(lp) == WM_CONTEXTMENU) {
             POINT pt; GetCursorPos(&pt);
             HMENU menu = CreatePopupMenu();
+            if (g_update_ready) {                    // a newer release exists → offer the download page
+                std::wstring um = std::wstring(T(L"🔴 发现新版本 ", L"🔴 New version ")) + g_update_tag
+                                  + T(L" — 点击下载", L" — click to download");
+                AppendMenu(menu, MF_STRING, IDM_UPDATE_OPEN, um.c_str());
+                AppendMenu(menu, MF_SEPARATOR, 0, nullptr);
+            }
             bool can = g_app.in_sleep && !g_app.mos.empty();
             AppendMenu(menu, MF_STRING | (can ? 0 : MF_GRAYED), IDM_DISMISS, T(L"驱散蚊子（默写滕王阁序）", L"Dismiss mosquitoes (transcribe)"));
+            bool can_skip = !g_app.in_sleep && !g_app.mos.empty();   // sedentary swarm out
+            AppendMenu(menu, MF_STRING | (can_skip ? 0 : MF_GRAYED), IDM_SKIP_REST, T(L"跳过本次休息（回满精力继续工作）", L"Skip this rest (refill & keep working)"));
             AppendMenu(menu, MF_SEPARATOR, 0, nullptr);
             HMENU pausem = CreatePopupMenu();
             AppendMenu(pausem, MF_STRING, IDM_PAUSE_30,  T(L"30 分钟", L"30 min"));
@@ -1602,6 +1742,8 @@ static LRESULT CALLBACK CtrlProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         return 0;
     case WM_COMMAND:
         if (LOWORD(wp) == IDM_DISMISS) open_dismiss();
+        else if (LOWORD(wp) == IDM_SKIP_REST) { g_app.refresh_full(); update_tray(); }
+        else if (LOWORD(wp) == IDM_UPDATE_OPEN) ShellExecute(nullptr, L"open", RELEASES_URL, nullptr, nullptr, SW_SHOWNORMAL);
         else if (LOWORD(wp) == IDM_PAUSE_30) g_app.pause_sed(30);
         else if (LOWORD(wp) == IDM_PAUSE_60) g_app.pause_sed(60);
         else if (LOWORD(wp) == IDM_PAUSE_120) g_app.pause_sed(120);
@@ -1694,6 +1836,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmdLine, int) {
     g_nid.hIcon = draw_tray_icon(0.0f, stage_color(-1), 1.0f);
     lstrcpyn(g_nid.szTip, T(L"愤怒的蚊子 · 守护中", L"AngryMoz · on watch"), 128);
     Shell_NotifyIcon(NIM_ADD, &g_nid);
+
+    // One silent update check on startup (background thread, exits when done).
+    if (HANDLE ht = CreateThread(nullptr, 0, update_thread, nullptr, 0, nullptr)) CloseHandle(ht);
 
     sound_init();   // autostart is opt-in via the tray "开机自启" checkbox
 

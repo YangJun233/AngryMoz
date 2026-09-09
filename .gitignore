@@ -16,3 +16,4 @@ mosquito.ini
 
 # dev-only preview artifacts
 preview_tray.*
+/AngryMoz_test.exe
