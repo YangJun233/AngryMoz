@@ -42,6 +42,8 @@ using namespace Gdiplus;
 // largest case plus margin and never has to be recreated on resize.
 static const int BOX = 220;
 
+#define APP_VER L"1.0.0"   // single source of truth for the displayed version
+
 // ------------------------------- language -----------------------------------
 static int g_lang = 0;   // 0 = 中文 (default), 1 = English
 static const wchar_t* T(const wchar_t* zh, const wchar_t* en) { return g_lang ? en : zh; }
@@ -1379,6 +1381,8 @@ static void open_settings() {
 
     CreateWindow(L"BUTTON", T(L"保存", L"Save"), WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, 330 * g_sc, 456 * g_sc, 110 * g_sc, 32 * g_sc, d, (HMENU)(INT_PTR)IDSAVE, g_app.hInst, nullptr);
     CreateWindow(L"BUTTON", T(L"取消", L"Cancel"), WS_CHILD | WS_VISIBLE, 455 * g_sc, 456 * g_sc, 110 * g_sc, 32 * g_sc, d, (HMENU)(INT_PTR)IDCANC, g_app.hInst, nullptr);
+    CreateWindow(L"STATIC", L"AngryMoz  v" APP_VER, WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
+                 20 * g_sc, 456 * g_sc, 150 * g_sc, 32 * g_sc, d, nullptr, g_app.hInst, nullptr);
 
     g_set.font = CreateFont(15 * g_sc, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Microsoft YaHei");
     EnumChildWindows(d, [](HWND c, LPARAM lp) -> BOOL { SendMessage(c, WM_SETFONT, (WPARAM)lp, TRUE); return TRUE; }, (LPARAM)g_set.font);
@@ -1391,7 +1395,7 @@ static void open_settings() {
 // ----------------------- help / 使用说明 window -----------------------------
 
 static const wchar_t* HELP_ZH =
-    L"愤怒的蚊子 · AngryMoz   v1.0.0\r\n"
+    L"愤怒的蚊子 · AngryMoz   v" APP_VER L"\r\n"
     L"────────────────────────────\r\n"
     L"嗨！我是一只专门盯着你的蚊子 🦟\r\n"
     L"我的工作只有两件：白天不让你坐太久，晚上催你早点睡。\r\n"
@@ -1452,7 +1456,7 @@ static const wchar_t* HELP_ZH =
     L"——你的私人蚊子 🦟\r\n";
 
 static const wchar_t* HELP_EN =
-    L"AngryMoz · 愤怒的蚊子   v1.0.0\r\n"
+    L"AngryMoz · 愤怒的蚊子   v" APP_VER L"\r\n"
     L"────────────────────────────\r\n"
     L"Hi! I'm a mosquito that keeps an eye on you 🦟\r\n"
     L"I have two jobs: keep you from sitting too long by day, and nudge you to bed at night.\r\n"
