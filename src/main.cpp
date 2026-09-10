@@ -43,7 +43,7 @@ using namespace Gdiplus;
 // largest case plus margin and never has to be recreated on resize.
 static const int BOX = 220;
 
-#define APP_VER_STR "1.1.0"          // single source of truth (narrow, for update compare)
+#define APP_VER_STR "1.1.1"          // single source of truth (narrow, for update compare)
 #define APP_VER_WIDE2(x) L##x
 #define APP_VER_WIDE(x) APP_VER_WIDE2(x)
 #define APP_VER APP_VER_WIDE(APP_VER_STR)   // wide L"1.0.0" for UI text
@@ -850,7 +850,7 @@ static void open_dismiss() {
         reg = true;
     }
 
-    int W = 620, H = 400;
+    int W = 780, H = 600;
     int sx = (GetSystemMetrics(SM_CXSCREEN) - W) / 2, sy = (GetSystemMetrics(SM_CYSCREEN) - H) / 2;
     g_dlg.hwnd = CreateWindowEx(WS_EX_TOPMOST, L"MosDismiss", T(L"驱散蚊子 — 默写《滕王阁序》", L"Dismiss — transcription"),
                                 WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, sx, sy, W, H,
@@ -863,10 +863,10 @@ static void open_dismiss() {
     std::wstring pm = std::wstring(T(L"提示：…", L"Hint: …")) + ctx + L"\r\n"
                       + T(L"请接着往下默写 ", L"Keep typing the next ") + std::to_wstring(N)
                       + T(L" 个字（睡吧，别熬了）", L" characters (just go to sleep~)");
-    g_dlg.prompt = CreateWindow(L"STATIC", pm.c_str(), WS_CHILD | WS_VISIBLE, 20, 14, W - 56, 60, g_dlg.hwnd, nullptr, g_app.hInst, nullptr);
+    g_dlg.prompt = CreateWindow(L"STATIC", pm.c_str(), WS_CHILD | WS_VISIBLE, 20, 16, W - 56, 64, g_dlg.hwnd, nullptr, g_app.hInst, nullptr);
     g_dlg.edit   = CreateWindowEx(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL,
-                                  20, 82, W - 56, 200, g_dlg.hwnd, (HMENU)(INT_PTR)IDC_EDIT, g_app.hInst, nullptr);
-    g_dlg.prog   = CreateWindow(L"STATIC", L"", WS_CHILD | WS_VISIBLE, 20, 292, W - 56, 26, g_dlg.hwnd, nullptr, g_app.hInst, nullptr);
+                                  20, 88, W - 56, 430, g_dlg.hwnd, (HMENU)(INT_PTR)IDC_EDIT, g_app.hInst, nullptr);
+    g_dlg.prog   = CreateWindow(L"STATIC", L"", WS_CHILD | WS_VISIBLE, 20, 528, W - 56, 30, g_dlg.hwnd, nullptr, g_app.hInst, nullptr);
     g_edit_orig = (WNDPROC)SetWindowLongPtr(g_dlg.edit, GWLP_WNDPROC, (LONG_PTR)EditNoPaste);
     SendMessage(g_dlg.prompt, WM_SETFONT, (WPARAM)g_dlg.font, TRUE);
     SendMessage(g_dlg.edit,   WM_SETFONT, (WPARAM)g_dlg.bigfont, TRUE);
@@ -903,8 +903,11 @@ static Color stage_color(int stg) {
     default: return Color(255, 150, 150, 150); // idle gray
     }
 }
-static int blink_half_ms(int stg) {            // 0 = no blink
-    switch (stg) { case 1: return 1000; case 2: return 500; case 3: return 250; case 4: return 125; default: return 0; }
+// Blink half-period in ms: low urgency = slow/calm, high urgency = fast/urgent.
+// Must never return 0 — SetTimer clamps 0 to ~10ms, which strobes (the early-sleep
+// "fast flash" bug). Stage 0 is the calmest slow blink.
+static int blink_half_ms(int stg) {
+    switch (stg) { case 0: return 1500; case 1: return 1000; case 2: return 500; case 3: return 250; case 4: return 125; default: return 1500; }
 }
 
 static Bitmap* g_face = nullptr;   // the user's mosquito artwork (embedded PNG)

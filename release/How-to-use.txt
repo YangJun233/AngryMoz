@@ -1,4 +1,4 @@
-愤怒的蚊子 · AngryMoz   v1.1.0  —— 久坐/熬夜提醒小工具
+愤怒的蚊子 · AngryMoz   v1.1.1  —— 久坐/熬夜提醒小工具
 ============================================================
 （首次运行会弹出中英文选择，默认中文；之后可在“设置”里切换。）
 (First run asks Chinese/English, default Chinese; switch later in Settings.)
@@ -63,7 +63,7 @@ English version is in the second half of this file ↓
 
 
 ============================================================
-Angry Mosquito · AngryMoz   v1.1.0  — a sit-less / sleep-on-time nudger
+Angry Mosquito · AngryMoz   v1.1.1  — a sit-less / sleep-on-time nudger
 ============================================================
 (First run asks you to pick Chinese or English, default Chinese;
 you can switch anytime in Settings.)
