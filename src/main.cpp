@@ -43,7 +43,7 @@ using namespace Gdiplus;
 // largest case plus margin and never has to be recreated on resize.
 static const int BOX = 220;
 
-#define APP_VER_STR "1.1.1"          // single source of truth (narrow, for update compare)
+#define APP_VER_STR "1.1.2"          // single source of truth (narrow, for update compare)
 #define APP_VER_WIDE2(x) L##x
 #define APP_VER_WIDE(x) APP_VER_WIDE2(x)
 #define APP_VER APP_VER_WIDE(APP_VER_STR)   // wide L"1.0.0" for UI text
@@ -666,11 +666,13 @@ struct App {
 
     void render_tick() {
         int M = (int)g_monitors.size();
+        // Sleep mode: mosquitoes speed up with bedtime urgency, 1x → 2x by the end.
+        float spd = in_sleep ? max_speed * (1.0f + cur_prog) : max_speed;
         for (size_t i = 0; i < mos.size(); ++i) {
             if (mos[i].mon == suppress_mon) continue;         // hidden: don't animate
             int mon = mos[i].mon < M ? mos[i].mon : M - 1;
             const RECT& r = g_monitors[mon];
-            update_mosquito(mos[i], r.left, r.top, r.right - r.left, r.bottom - r.top, max_speed);
+            update_mosquito(mos[i], r.left, r.top, r.right - r.left, r.bottom - r.top, spd);
             render_mosview(views[i], mos[i]);
         }
     }
