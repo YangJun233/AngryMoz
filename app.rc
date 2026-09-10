@@ -4,8 +4,8 @@
 102 RCDATA "english.txt"
 
 1 VERSIONINFO
-FILEVERSION 1,1,2,0
-PRODUCTVERSION 1,1,2,0
+FILEVERSION 1,2,0,0
+PRODUCTVERSION 1,2,0,0
 FILEFLAGSMASK 0x3fL
 FILEFLAGS 0x0L
 FILEOS 0x40004L
@@ -18,11 +18,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "AngryMoz"
             VALUE "FileDescription", "AngryMoz (Angry Mosquito) - sit/sleep nudger"
-            VALUE "FileVersion", "1.1.2.0"
+            VALUE "FileVersion", "1.2.0.0"
             VALUE "InternalName", "AngryMoz"
             VALUE "OriginalFilename", "AngryMoz.exe"
             VALUE "ProductName", "AngryMoz"
-            VALUE "ProductVersion", "1.1.2"
+            VALUE "ProductVersion", "1.2.0"
         END
     END
     BLOCK "VarFileInfo"

@@ -1,4 +1,4 @@
-愤怒的蚊子 · AngryMoz   v1.1.2  —— 久坐/熬夜提醒小工具
+愤怒的蚊子 · AngryMoz   v1.2.0  —— 久坐/熬夜提醒小工具
 ============================================================
 （首次运行会弹出中英文选择，默认中文；之后可在“设置”里切换。）
 (First run asks Chinese/English, default Chinese; switch later in Settings.)
@@ -39,7 +39,7 @@ English version is in the second half of this file ↓
 - 工作时长（默认 40 分钟）
 - 离开回满：中途离开/停手多久算真休息、精力回满（默认 15 分钟）
 - 出蚊子后休息：歇多久蚊子消失（默认 5 分钟）
-- 每隔几分钟多一只 / 最多几只
+- 每隔几秒多一只 / 最多几只
 - 睡觉开始、结束时间
 - 蚊子大小、飞行速度、声音、开机自启
 - 默写字数 N（默认 100）
@@ -63,7 +63,7 @@ English version is in the second half of this file ↓
 
 
 ============================================================
-Angry Mosquito · AngryMoz   v1.1.2  — a sit-less / sleep-on-time nudger
+Angry Mosquito · AngryMoz   v1.2.0  — a sit-less / sleep-on-time nudger
 ============================================================
 (First run asks you to pick Chinese or English, default Chinese;
 you can switch anytime in Settings.)
@@ -112,7 +112,7 @@ right-click -> "Help".)
 - Work duration (default 40 min)
 - Away -> full: how long away/idle counts as real rest and refills (default 15 min)
 - Rest after mosquitoes: how long of rest clears them (default 5 min)
-- Minutes per extra mosquito / max count
+- Seconds per extra mosquito / max count
 - Sleep start & end time
 - Mosquito size, flight speed, sound, run-at-startup
 - Transcription length N (default 100)

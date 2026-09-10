@@ -43,7 +43,7 @@ using namespace Gdiplus;
 // largest case plus margin and never has to be recreated on resize.
 static const int BOX = 220;
 
-#define APP_VER_STR "1.1.2"          // single source of truth (narrow, for update compare)
+#define APP_VER_STR "1.2.0"          // single source of truth (narrow, for update compare)
 #define APP_VER_WIDE2(x) L##x
 #define APP_VER_WIDE(x) APP_VER_WIDE2(x)
 #define APP_VER APP_VER_WIDE(APP_VER_STR)   // wide L"1.0.0" for UI text
@@ -1263,8 +1263,8 @@ static void check_update_interactive(HWND owner) {
 // ----------------------- settings (AngryMoz.ini + dialog) -------------------
 
 struct Settings {
-    int work_min = 40, rest_min = 5, sed_step_min = 1, sed_max = 5, work_break_min = 15;
-    int sleep_enabled = 1, sleep_start = 23 * 60 + 30, sleep_end = 6 * 60, sleep_step_min = 3, sleep_max = 10;
+    int work_min = 40, rest_min = 5, sed_step_s = 60, sed_max = 5, work_break_min = 15;
+    int sleep_enabled = 1, sleep_start = 23 * 60 + 30, sleep_end = 6 * 60, sleep_step_s = 180, sleep_max = 10;
     double sleep_mult = 2.0, base_size = 3.0, max_speed = 32.0;
     int dismiss_N = 100, return_min = 5, escalate_penalty = 1;
     int sound = 1, autostart = 0;
@@ -1283,13 +1283,13 @@ static void load_settings() {
     Settings& g = g_settings;
     g.work_min       = GetPrivateProfileInt(S, L"work_min", g.work_min, f);
     g.rest_min       = GetPrivateProfileInt(S, L"rest_min", g.rest_min, f);
-    g.sed_step_min   = GetPrivateProfileInt(S, L"sed_step_min", g.sed_step_min, f);
+    g.sed_step_s   = GetPrivateProfileInt(S, L"sed_step_s", g.sed_step_s, f);
     g.sed_max        = GetPrivateProfileInt(S, L"sed_max", g.sed_max, f);
     g.work_break_min = GetPrivateProfileInt(S, L"work_break_min", g.work_break_min, f);
     g.sleep_enabled  = GetPrivateProfileInt(S, L"sleep_enabled", g.sleep_enabled, f);
     g.sleep_start    = GetPrivateProfileInt(S, L"sleep_start", g.sleep_start, f);
     g.sleep_end      = GetPrivateProfileInt(S, L"sleep_end", g.sleep_end, f);
-    g.sleep_step_min = GetPrivateProfileInt(S, L"sleep_step_min", g.sleep_step_min, f);
+    g.sleep_step_s = GetPrivateProfileInt(S, L"sleep_step_s", g.sleep_step_s, f);
     g.sleep_max      = GetPrivateProfileInt(S, L"sleep_max", g.sleep_max, f);
     g.dismiss_N      = GetPrivateProfileInt(S, L"dismiss_N", g.dismiss_N, f);
     g.return_min     = GetPrivateProfileInt(S, L"return_min", g.return_min, f);
@@ -1307,10 +1307,10 @@ static void save_settings() {
     std::wstring p = ini_path(); const wchar_t* S = L"settings"; const wchar_t* f = p.c_str();
     Settings& g = g_settings; wchar_t b[64];
     auto wi = [&](const wchar_t* k, int v) { wsprintf(b, L"%d", v); WritePrivateProfileString(S, k, b, f); };
-    wi(L"work_min", g.work_min); wi(L"rest_min", g.rest_min); wi(L"sed_step_min", g.sed_step_min); wi(L"sed_max", g.sed_max);
+    wi(L"work_min", g.work_min); wi(L"rest_min", g.rest_min); wi(L"sed_step_s", g.sed_step_s); wi(L"sed_max", g.sed_max);
     wi(L"work_break_min", g.work_break_min);
     wi(L"sleep_enabled", g.sleep_enabled); wi(L"sleep_start", g.sleep_start); wi(L"sleep_end", g.sleep_end);
-    wi(L"sleep_step_min", g.sleep_step_min); wi(L"sleep_max", g.sleep_max);
+    wi(L"sleep_step_s", g.sleep_step_s); wi(L"sleep_max", g.sleep_max);
     wi(L"dismiss_N", g.dismiss_N); wi(L"return_min", g.return_min); wi(L"escalate_penalty", g.escalate_penalty);
     wi(L"sound", g.sound); wi(L"lang", g.lang);
     swprintf(b, 64, L"%.2f", g.sleep_mult); WritePrivateProfileString(S, L"sleep_mult", b, f);
@@ -1323,12 +1323,12 @@ static void apply_settings() {
     Config c = make_config(g_app.fast);
     if (!g_app.fast) {              // dev --fast keeps its compressed timeline
         c.work_threshold_s = g.work_min * 60;
-        c.escalate_every_s = g.sed_step_min * 60;
+        c.escalate_every_s = g.sed_step_s < 1 ? 1 : g.sed_step_s;   // seconds; guard div-by-zero
         c.max_sedentary    = g.sed_max;
         c.work_break_s     = g.work_break_min * 60;
         c.rest_window_s    = g.rest_min * 60;
         c.rest_max_active_s = g.rest_min * 60 * 5 / 100;
-        c.sleep_growth_s   = g.sleep_step_min * 60;
+        c.sleep_growth_s   = g.sleep_step_s < 1 ? 1 : g.sleep_step_s;   // seconds; guard div-by-zero
         c.sleep_max        = g.sleep_max;
         c.sleep_return_s   = g.return_min * 60;
     }
@@ -1433,9 +1433,9 @@ static LRESULT CALLBACK SetProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         if (LOWORD(w) == IDSAVE) {
             Settings& g = g_settings;
             g.work_min = g_int(g_set.work); g.work_break_min = g_int(g_set.wbrk); g.rest_min = g_int(g_set.rest);
-            g.sed_step_min = g_int(g_set.sstep); g.sed_max = g_int(g_set.smax);
+            g.sed_step_s = g_int(g_set.sstep); g.sed_max = g_int(g_set.smax);
             g.sleep_enabled = g_ck[0]; g.sleep_start = parse_hhmm(g_set.sstart);
-            g.sleep_end = parse_hhmm(g_set.send); g.sleep_step_min = g_int(g_set.slstep);
+            g.sleep_end = parse_hhmm(g_set.send); g.sleep_step_s = g_int(g_set.slstep);
             g.sleep_max = g_int(g_set.slmax); g.sleep_mult = g_dbl(g_set.smult);
             g.dismiss_N = g_int(g_set.dN); g.return_min = g_int(g_set.ret);
             g.escalate_penalty = g_ck[1];
@@ -1492,7 +1492,7 @@ static void open_settings() {
     s_label(d, T(L"工作时长(分)", L"Work (min)"), LX, 126);        g_set.work  = s_edit(d, std::to_wstring(g.work_min), LC, 126);
     s_label(d, T(L"离开回满(分)", L"Away→full (min)"), LX, 156); g_set.wbrk  = s_edit(d, std::to_wstring(g.work_break_min), LC, 156);
     s_label(d, T(L"出蚊子后休息(分)", L"Rest→clear (min)"), LX, 186); g_set.rest = s_edit(d, std::to_wstring(g.rest_min), LC, 186);
-    s_label(d, T(L"每隔(分)+1只", L"+1 every (min)"), LX, 216);     g_set.sstep = s_edit(d, std::to_wstring(g.sed_step_min), LC, 216);
+    s_label(d, T(L"每隔(秒)+1只", L"+1 every (sec)"), LX, 216);     g_set.sstep = s_edit(d, std::to_wstring(g.sed_step_s), LC, 216);
     s_label(d, T(L"上限(只/屏)", L"Max (/screen)"), LX, 246);       g_set.smax  = s_edit(d, std::to_wstring(g.sed_max), LC, 246);
 
     // ---- 睡觉 (right) — grayed out when disabled ----
@@ -1503,7 +1503,7 @@ static void open_settings() {
                      RX * g_sc, 154 * g_sc, 270 * g_sc, 22 * g_sc, d, nullptr, g_app.hInst, nullptr));
     SLP(s_label(d, T(L"开始(HH:MM)", L"Start (HH:MM)"), RX, 182)); g_set.sstart = SLP(s_edit(d, hhmm(g.sleep_start), RC, 182));
     SLP(s_label(d, T(L"结束(HH:MM)", L"End (HH:MM)"), RX, 210));   g_set.send   = SLP(s_edit(d, hhmm(g.sleep_end), RC, 210));
-    SLP(s_label(d, T(L"每隔(分)+1只", L"+1 every (min)"), RX, 238)); g_set.slstep = SLP(s_edit(d, std::to_wstring(g.sleep_step_min), RC, 238));
+    SLP(s_label(d, T(L"每隔(秒)+1只", L"+1 every (sec)"), RX, 238)); g_set.slstep = SLP(s_edit(d, std::to_wstring(g.sleep_step_s), RC, 238));
     SLP(s_label(d, T(L"上限(只/屏)", L"Max (/screen)"), RX, 266)); g_set.slmax  = SLP(s_edit(d, std::to_wstring(g.sleep_max), RC, 266));
     SLP(s_label(d, T(L"放大倍数", L"Grow x"), RX, 294));          g_set.smult  = SLP(s_edit(d, fmt1(g.sleep_mult), RC, 294));
     bool method_editable = (GetTickCount() - g_boot) < 5 * 60 * 1000;
@@ -1582,7 +1582,7 @@ static const wchar_t* HELP_ZH =
     L"· 工作时长：坐多久算久坐（默认 40 分钟）\r\n"
     L"· 离开回满：白天离开/停手多久精力回满（默认 15 分钟）\r\n"
     L"· 出蚊子后休息：被蚊子催了之后，歇多久蚊子消失（默认 5 分钟）\r\n"
-    L"· 每隔几分钟多一只 / 最多几只：蚊子变多的速度和上限\r\n"
+    L"· 每隔几秒多一只 / 最多几只：蚊子变多的速度和上限\r\n"
     L"· 睡觉开始、结束时间：晚上几点开始催、到几点收工\r\n"
     L"· 蚊子大小、飞行速度：想要更大更快，随你\r\n"
     L"· 声音开关、开机自启\r\n"
