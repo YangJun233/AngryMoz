@@ -43,7 +43,7 @@ using namespace Gdiplus;
 // largest case plus margin and never has to be recreated on resize.
 static const int BOX = 220;
 
-#define APP_VER_STR "1.2.0"          // single source of truth (narrow, for update compare)
+#define APP_VER_STR "1.2.1"          // single source of truth (narrow, for update compare)
 #define APP_VER_WIDE2(x) L##x
 #define APP_VER_WIDE(x) APP_VER_WIDE2(x)
 #define APP_VER APP_VER_WIDE(APP_VER_STR)   // wide L"1.0.0" for UI text
@@ -1067,10 +1067,9 @@ static void update_tray() {
 static const int  SR = 22050;
 static const int  CHUNK = 1103;          // ~50 ms per buffer
 static const int  NBUF = 3;
-static HWAVEOUT   g_wo = nullptr;
-static WAVEHDR    g_hdr[NBUF];
-static std::vector<short> g_buf[NBUF];
-static volatile bool g_snd_run = false;
+static volatile bool g_snd_run = false;   // keep the audio thread alive
+static HANDLE     g_snd_thread = nullptr;
+static volatile LONG g_snd_vol = 0;       // target volume 0..0xFFFF: UI writes, audio thread applies
 
 static double g_phase = 0.0, g_freq = 480.0, g_ftarget = 500.0, g_flut = 0.0;
 
@@ -1094,46 +1093,77 @@ static void gen_chunk(short* out, int n) {
     }
 }
 
-static void CALLBACK sndCB(HWAVEOUT, UINT m, DWORD_PTR, DWORD_PTR p1, DWORD_PTR) {
-    if (m == WOM_DONE && g_snd_run) {
-        WAVEHDR* h = (WAVEHDR*)p1;
-        gen_chunk((short*)h->lpData, h->dwBufferLength / 2);
-        waveOutWrite(g_wo, h, sizeof(WAVEHDR));
-    }
-}
-
-static void sound_init() {
+// All waveOut calls live on THIS thread only. A blocking/hanging audio driver —
+// e.g. while Windows re-routes the output endpoint (manual switch, HDMI/monitor
+// sleep, Bluetooth connect, USB DAC, power event) — can then only ever stall this
+// thread, never the UI thread (menu, mosquitoes). We use CALLBACK_EVENT and never
+// call any waveOut function from a callback (the old code called waveOutWrite from
+// inside the callback, a documented deadlock). On a write error or a stall (no
+// buffer completes for ~2s => endpoint changed), we tear down and reopen, which
+// re-binds to the new default device via WAVE_MAPPER, so the buzz self-heals.
+static DWORD WINAPI audio_thread(LPVOID) {
     WAVEFORMATEX f{};
     f.wFormatTag = WAVE_FORMAT_PCM; f.nChannels = 1; f.nSamplesPerSec = SR;
     f.wBitsPerSample = 16; f.nBlockAlign = 2; f.nAvgBytesPerSec = SR * 2;
-    if (waveOutOpen(&g_wo, WAVE_MAPPER, &f, (DWORD_PTR)sndCB, 0, CALLBACK_FUNCTION) != MMSYSERR_NOERROR) { g_wo = nullptr; return; }
-    g_snd_run = true;
-    for (int b = 0; b < NBUF; ++b) {
-        g_buf[b].assign(CHUNK, 0);
-        g_hdr[b] = {};
-        g_hdr[b].lpData = (LPSTR)g_buf[b].data();
-        g_hdr[b].dwBufferLength = CHUNK * 2;
-        waveOutPrepareHeader(g_wo, &g_hdr[b], sizeof(WAVEHDR));
-        gen_chunk((short*)g_hdr[b].lpData, CHUNK);
-        waveOutWrite(g_wo, &g_hdr[b], sizeof(WAVEHDR));
+
+    while (g_snd_run) {
+        HANDLE ev = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+        HWAVEOUT wo = nullptr;
+        if (!ev || waveOutOpen(&wo, WAVE_MAPPER, &f, (DWORD_PTR)ev, 0, CALLBACK_EVENT) != MMSYSERR_NOERROR) {
+            if (ev) CloseHandle(ev);
+            for (int i = 0; i < 20 && g_snd_run; ++i) Sleep(50);   // ~1s, then retry
+            continue;
+        }
+        std::vector<short> buf[NBUF];
+        WAVEHDR hdr[NBUF] = {};
+        for (int b = 0; b < NBUF; ++b) {
+            buf[b].assign(CHUNK, 0);
+            hdr[b].lpData = (LPSTR)buf[b].data();
+            hdr[b].dwBufferLength = CHUNK * 2;
+            waveOutPrepareHeader(wo, &hdr[b], sizeof(WAVEHDR));
+            gen_chunk((short*)hdr[b].lpData, CHUNK);
+            waveOutWrite(wo, &hdr[b], sizeof(WAVEHDR));
+        }
+        DWORD applied = 0xFFFFFFFF;
+        int stalls = 0;
+        bool reopen = false;
+        while (g_snd_run && !reopen) {
+            WaitForSingleObject(ev, 200);
+            LONG tv = g_snd_vol;
+            if ((DWORD)tv != applied) { waveOutSetVolume(wo, (DWORD)tv | ((DWORD)tv << 16)); applied = (DWORD)tv; }
+            bool any_done = false;
+            for (int b = 0; b < NBUF; ++b) {
+                if (hdr[b].dwFlags & WHDR_DONE) {
+                    any_done = true;
+                    gen_chunk((short*)hdr[b].lpData, CHUNK);
+                    if (waveOutWrite(wo, &hdr[b], sizeof(WAVEHDR)) != MMSYSERR_NOERROR) { reopen = true; break; }
+                }
+            }
+            stalls = any_done ? 0 : stalls + 1;   // ~2s with no completion => device changed
+            if (stalls > 10) reopen = true;
+        }
+        waveOutReset(wo);
+        for (int b = 0; b < NBUF; ++b) waveOutUnprepareHeader(wo, &hdr[b], sizeof(WAVEHDR));
+        waveOutClose(wo);
+        CloseHandle(ev);
     }
-    waveOutSetVolume(g_wo, 0);   // silent until update_sound raises it
+    return 0;
 }
 
+static void sound_init() {
+    g_snd_run = true;
+    g_snd_thread = CreateThread(nullptr, 0, audio_thread, nullptr, 0, nullptr);
+}
+
+// UI thread only stores the target volume; the audio thread applies it. Never blocks.
 static void sound_set_volume(float v) {
-    if (!g_wo) return;
     if (v < 0) v = 0; if (v > 1) v = 1;
-    DWORD w = (DWORD)(v * 0xFFFF);
-    waveOutSetVolume(g_wo, w | (w << 16));
+    g_snd_vol = (LONG)(v * 0xFFFF);
 }
 
 static void sound_close() {
-    if (!g_wo) return;
     g_snd_run = false;
-    waveOutReset(g_wo);
-    for (int b = 0; b < NBUF; ++b) waveOutUnprepareHeader(g_wo, &g_hdr[b], sizeof(WAVEHDR));
-    waveOutClose(g_wo);
-    g_wo = nullptr;
+    if (g_snd_thread) { WaitForSingleObject(g_snd_thread, 2000); CloseHandle(g_snd_thread); g_snd_thread = nullptr; }
 }
 
 // ----------------------- autostart (HKCU Run) -------------------------------
